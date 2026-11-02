@@ -1,0 +1,10 @@
+build*/
+*.o
+*.obj
+*.exe
+*.ppm
+out/
+.vscode/
+.idea/
+.DS_Store
+compile_commands.json
