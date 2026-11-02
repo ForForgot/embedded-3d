@@ -36,22 +36,21 @@ draw function you call.
 
 ## Layout
 
-    src/                      the library (flat, so Arduino picks it up as-is)
-      embd3d.h                umbrella header
-      embd3d_config.h         compile time configuration and tier switches
-      embd3d_vec3.{h,c}       vector math
-      embd3d_mat4.{h,c}       4x4 row-vector matrices (float)
-      embd3d_fixed.{h,c}      Q16.16 matrices and mesh conversion
-      embd3d_framebuffer.{h,c}pixel format, clear, RGB888 export
-      embd3d_raster.{h,c}     triangle / line rasterizer with depth test
-      embd3d_mesh.h           indexed triangle list (float and fixed)
-      embd3d_render.{h,c}     tiers, clipping, projection, shading, cache
+    src/                        the library (flat, so Arduino picks it up as-is)
+      embd3d.h                  umbrella header
+      embd3d_config.h           compile time configuration and tier switches
+      embd3d_vec3.{h,c}         vector math
+      embd3d_mat4.{h,c}         4x4 row-vector matrices (float)
+      embd3d_fixed.{h,c}        Q16.16 matrices and mesh conversion
+      embd3d_framebuffer.{h,c}  pixel format, clear, RGB888 export
+      embd3d_raster.{h,c}       triangle / line rasterizer with depth test
+      embd3d_mesh.h             indexed triangle list (float and fixed)
+      embd3d_render.{h,c}       tiers, clipping, projection, shading, cache
     examples/
-      demo/                   headless PPM renderer (cube or sphere, float or fx)
-      arduino/embd3d_spin/    the same pipeline on an Arduino + OLED
-    tests/test_embd3d.c       unit tests, built once per tier by CTest
-    docs/DESIGN.md            why the implementation looks like it does
-    docs/PORTING-FROM-OL3D.md API map and behavioural differences
+      demo/                     headless PPM renderer (cube or sphere, float or fx)
+      arduino/embd3d_spin/      the same pipeline on an Arduino + OLED
+    tests/test_embd3d.c         unit tests, built once per tier by CTest
+    docs/DESIGN.md              why the implementation looks like it does
 
 ## Quick start
 
@@ -242,7 +241,3 @@ Two things this table does **not** say:
 ## License
 
 MIT - see [LICENSE](LICENSE). Copyright (c) 2026 ForForgot.
-
-The design started from ol3d, an earlier take on the same idea
-(https://github.com/ForForgot/ol3d). No code is shared with it; see
-docs/PORTING-FROM-OL3D.md for the API mapping if you are coming from there.
