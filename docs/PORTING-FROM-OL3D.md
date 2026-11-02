@@ -15,9 +15,8 @@ complete map.
 Everything moved from the repository root into src/, so -Isrc (or the Arduino
 library layout) replaces the old flat include path.
 
-The 1.x sources are **not** part of this repository. If you want to reproduce the
-A/B benchmark, copy them into bench/legacy/ from the upstream project; the
-benchmark target is only configured when they are present.
+The 1.x sources are **not** part of this repository; the upstream project is the
+reference for them.
 
 ## Types
 

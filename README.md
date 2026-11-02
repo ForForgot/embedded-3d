@@ -12,7 +12,6 @@
       demo/                   headless PPM renderer (cube or sphere, float or fx)
       arduino/embd3d_spin/    the same pipeline on an Arduino + OLED
     tests/test_embd3d.c       unit tests, built once per tier by CTest
-    bench/                    A/B benchmark against ol3d 1.x (sources not shipped)
     docs/DESIGN.md            why the implementation looks like it does
     docs/PORTING-FROM-OL3D.md API map and behavioural differences
 
@@ -152,11 +151,13 @@ flash numbers; the ratios are the point):
 
 ## Performance
 
-Same 1280 triangle sphere, same 128x128 target, same flags, measured with
-bench/bench_compare.c. Fragment counts are printed next to the timings so that
-"faster because it drew less" cannot hide.
+Numbers from a one-off comparison run during development: the same 1280 triangle
+sphere, the same 128x128 target, the same flags on both sides, with fragment
+counts checked so that "faster because it drew less" could not hide. The
+comparison harness is not part of this repository (it needs another project's
+sources), so these are historical figures rather than something you can rerun.
 
-Frame time relative to 1.x (negative is faster):
+Frame time relative to the 1.x code this project started from (negative is faster):
 
 | variant | -O3 | -Os |
 |---|---:|---:|
@@ -169,7 +170,7 @@ Fragments written: 7532 (1.x) vs 7775 (embedded-3d) on the same scene.
 
 Only the ratios are published because the absolute numbers move by tens of
 percent between machines and even between runs on the same machine; the ratios
-stayed put across every run here. Run the benchmark to get your own ms/frame.
+stayed put across every run.
 
 Two things this table does **not** say:
 

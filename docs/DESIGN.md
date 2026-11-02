@@ -3,9 +3,11 @@
 This document records *why* the implementation looks the way it does: the
 problem, the chosen solution, the alternatives, and what it measured.
 
-All numbers come from bench/bench_compare.c (GCC 13, x86-64 host, 1280 triangle
-sphere, 128x128 target, identical flags for both sides). Host timings are not
-MCU timings; they are used to compare *algorithms*, not absolute cost.
+All numbers come from a one-off A/B run made during development (GCC 13, x86-64
+host, 1280 triangle sphere, 128x128 target, identical flags for both sides).
+Host timings are not MCU timings; they are used to compare *algorithms*, not
+absolute cost. The harness is not part of this repository, so the figures are
+historical rather than reproducible here.
 
 ---
 
@@ -200,11 +202,11 @@ sections 11 to 13.
 
 ## 10. Measurement method (and its limits)
 
-* bench/bench_compare.c builds **both** implementations into one binary, builds
-  the matrices for both with the same intended field of view (the legacy
-  setPerspective() is fed a pre-warped angle to compensate for its reciprocal bug,
-  otherwise it would rasterize a 3.7x larger object and look artificially slow),
-  and times 300 frames of "clear + draw" for each.
+* Both implementations were built into one binary, with the matrices built to the
+  same intended field of view (the old setPerspective() was fed a pre-warped
+  angle to compensate for its reciprocal bug, otherwise it would have rasterized
+  a 3.7x larger object and looked artificially slow), and 300 frames of
+  "clear + draw" were timed for each.
 * Timing uses clock(), so resolution is coarse: the loops are sized to run for
   hundreds of milliseconds, and the published figures are medians of five runs.
 * Fragment counts are printed next to the timings precisely so that drawing less

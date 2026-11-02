@@ -3,7 +3,6 @@ project(embd3d VERSION 1.0.0 LANGUAGES C)
 
 option(EMBD3D_BUILD_EXAMPLES "Build the demo programs" ON)
 option(EMBD3D_BUILD_TESTS    "Build the unit tests and the tier matrix" ON)
-option(EMBD3D_BUILD_BENCH    "Build the A/B benchmark against the frozen legacy code" ON)
 
 # --------------------------------------------------------------- library ---
 set(EMBD3D_SOURCES
@@ -71,35 +70,6 @@ endif()
 if(EMBD3D_BUILD_EXAMPLES)
     add_executable(embd3d_demo examples/demo/main.c)
     target_link_libraries(embd3d_demo PRIVATE embd3d)
-endif()
-
-# ---------------------------------------------------------------- bench ----
-if(EMBD3D_BUILD_BENCH)
-    # The A/B benchmark needs the 1.x sources next to it.  They are not shipped
-    # with this project; see bench/README.md for how to drop them in.  Without
-    # them the target is simply not configured.
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bench/legacy/ol3d_matrix.c)
-        add_executable(embd3d_bench
-            bench/bench_compare.c
-            bench/legacy/ol3d_core.c
-            bench/legacy/ol3d_matrix.c
-            bench/legacy/ol3d_vector.c
-            bench/legacy/ol3d_render.c
-        )
-        target_include_directories(embd3d_bench PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/bench
-            ${CMAKE_CURRENT_SOURCE_DIR}
-        )
-        target_link_libraries(embd3d_bench PRIVATE embd3d)
-        # The 1.x sources predate <math.h> being included; force it in rather
-        # than editing code that is supposed to stay byte identical.
-        if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-            target_compile_options(embd3d_bench PRIVATE
-                "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/bench/math_compat.h")
-        endif()
-    else()
-        message(STATUS "embd3d: bench/legacy/ is empty, skipping the 1.x A/B benchmark")
-    endif()
 endif()
 
 # -------------------------------------------------------------- install ----
