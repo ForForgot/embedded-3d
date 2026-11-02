@@ -65,7 +65,7 @@ void loop(void) {
     yaw += 8.0f;
 
     embd3d_fb_clear(&g_fb, EMBD3D_RGB(0, 0, 0));
-    embd3d_draw_mesh(&g_fb, &g_mesh, mvp, &model, &g_ctx);
+    embd3d_draw_mesh(&g_fb, &g_mesh, mvp, model, &g_ctx);
 
     embd3d_fb_export_rgb888(&g_fb, g_rgb);
     OLED_fill(g_rgb);

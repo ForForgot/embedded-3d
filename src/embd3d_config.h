@@ -85,8 +85,17 @@ typedef EMBD3D_INDEX_TYPE embd3d_index_t;
 
 /* ------------------------------------------------------------------ *
  * Rasterizer subpixel precision (bits).  4 gives 1/16 pixel snapping,
- * which is enough to hide jitter on a 128 px panel and keeps the edge
- * functions inside int32 for any sane viewport.
+ * which is enough to hide jitter on a 128 px panel.
+ *
+ * Budget: edge functions are int32, and a projected vertex is clamped to
+ * +-4 in NDC, so a coordinate can reach 4.5 * width * 2^bits.  The product
+ * of two such coordinates must stay below 2^31:
+ *
+ *     4.5 * width * 2^bits  <  32768      (about)
+ *
+ * 4 bits is safe up to ~570 px wide, 5 bits up to ~285 px, 3 bits up to
+ * ~1140 px.  Going over silently corrupts the edge functions and the
+ * triangle stops being drawn, which is why the default is conservative.
  * ------------------------------------------------------------------ */
 #ifndef EMBD3D_SUBPIXEL_BITS
 #define EMBD3D_SUBPIXEL_BITS 4

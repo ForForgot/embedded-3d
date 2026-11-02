@@ -82,15 +82,22 @@ typedef struct {
 
 void embd3d_vertex_cache_init(embd3d_vertex_cache_t *cache, void *data, uint16_t capacity);
 
-/* Draws an indexed triangle list. */
+/* Draws an indexed triangle list.
+ *
+ * mvp   : model * view * projection, row vector convention (v' = v * mvp)
+ * model : optional.  It is only used to rotate the face normal into world
+ *         space so the light does not follow the object; pass NULL to light
+ *         the mesh in its own space and skip 9 multiplies per face.
+ *         Declared as an array on purpose: pass `model`, not `&model`.
+ */
 void embd3d_draw_mesh(embd3d_framebuffer_t *fb, const embd3d_mesh_t *mesh,
-                    const embd3d_mat4_t mvp, const embd3d_mat4_t *model,
+                    const embd3d_mat4_t mvp, const embd3d_mat4_t model,
                     const embd3d_render_ctx_t *ctx);
 
 /* Same, reusing transformed vertices across the triangles of this mesh.
  * Falls back to the uncached path if the cache is NULL or too small. */
 void embd3d_draw_mesh_cached(embd3d_framebuffer_t *fb, const embd3d_mesh_t *mesh,
-                           const embd3d_mat4_t mvp, const embd3d_mat4_t *model,
+                           const embd3d_mat4_t mvp, const embd3d_mat4_t model,
                            const embd3d_render_ctx_t *ctx,
                            embd3d_vertex_cache_t *cache);
 

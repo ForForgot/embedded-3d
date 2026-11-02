@@ -26,6 +26,14 @@
 
 static int g_failures = 0;
 
+#define TEST_WHITE EMBD3D_RGB(255, 255, 255)
+
+/* Depth keys are relative so the suite also runs with EMBD3D_DEPTH_BITS=8.
+ * Bigger means nearer, 0 is the cleared value. */
+#define Z_FAR  ((int)(EMBD3D_DEPTH_MAX / 8))
+#define Z_MID  ((int)(EMBD3D_DEPTH_MAX / 2))
+#define Z_NEAR ((int)(EMBD3D_DEPTH_MAX - EMBD3D_DEPTH_MAX / 8))
+
 #define FBW 128
 #define FBH 128
 static embd3d_pixel_t g_color[FBW * FBH];
@@ -126,7 +134,7 @@ static void test_mat4(void) {
 
     /* a point on the near plane maps to z_ndc = -1, w = distance */
     {
-        embd3d_real_t x = 0, y = 0, z = -1, w = 1;
+        embd3d_real_t z = -1, w = 1;
         embd3d_real_t zc = z * m[10] + w * m[14];
         embd3d_real_t wc = z * m[11];
         CHECK_NEAR(zc / wc, -1.0, 1e-3);
@@ -170,9 +178,9 @@ static embd3d_screen_vertex_t sv(int x, int y, int z, embd3d_color_t c) {
 
 static void test_raster_area(void) {
     reset_fb();
-    embd3d_screen_vertex_t a = sv(10, 10, 1000, 0xFFFF);
-    embd3d_screen_vertex_t b = sv(110, 10, 1000, 0xFFFF);
-    embd3d_screen_vertex_t c = sv(10, 110, 1000, 0xFFFF);
+    embd3d_screen_vertex_t a = sv(10, 10, Z_MID, TEST_WHITE);
+    embd3d_screen_vertex_t b = sv(110, 10, Z_MID, TEST_WHITE);
+    embd3d_screen_vertex_t c = sv(10, 110, Z_MID, TEST_WHITE);
     embd3d_raster_triangle(&g_fb, &a, &b, &c, EMBD3D_CULL_NONE);
 
     long n = lit_pixels();
@@ -187,17 +195,17 @@ static void test_raster_area(void) {
      * point-in-triangle test used strict inequalities, so every shared edge
      * was a one pixel hole. */
     reset_fb();
-    embd3d_screen_vertex_t q0 = sv(10, 10, 1000, 0xFFFF);
-    embd3d_screen_vertex_t q1 = sv(110, 10, 1000, 0xFFFF);
-    embd3d_screen_vertex_t q2 = sv(110, 110, 1000, 0xFFFF);
-    embd3d_screen_vertex_t q3 = sv(10, 110, 1000, 0xFFFF);
+    embd3d_screen_vertex_t q0 = sv(10, 10, Z_MID, TEST_WHITE);
+    embd3d_screen_vertex_t q1 = sv(110, 10, Z_MID, TEST_WHITE);
+    embd3d_screen_vertex_t q2 = sv(110, 110, Z_MID, TEST_WHITE);
+    embd3d_screen_vertex_t q3 = sv(10, 110, Z_MID, TEST_WHITE);
     embd3d_raster_triangle(&g_fb, &q0, &q1, &q2, EMBD3D_CULL_NONE);
     embd3d_raster_triangle(&g_fb, &q0, &q2, &q3, EMBD3D_CULL_NONE);
     CHECK(lit_pixels() == 101 * 101);      /* the whole quad, no holes */
 
     /* degenerate triangle draws nothing */
     reset_fb();
-    embd3d_screen_vertex_t d = sv(50, 50, 1000, 0xFFFF);
+    embd3d_screen_vertex_t d = sv(50, 50, Z_MID, TEST_WHITE);
     embd3d_raster_triangle(&g_fb, &d, &d, &d, EMBD3D_CULL_NONE);
     CHECK(lit_pixels() == 0);
 }
@@ -208,9 +216,9 @@ static void test_raster_depth(void) {
 
     /* far first, then near: near must win */
     reset_fb();
-    embd3d_screen_vertex_t a1 = sv(0, 0, 100, far_c), b1 = sv(100, 0, 100, far_c), c1 = sv(0, 100, 100, far_c);
+    embd3d_screen_vertex_t a1 = sv(0, 0, Z_FAR, far_c), b1 = sv(100, 0, Z_FAR, far_c), c1 = sv(0, Z_FAR, 100, far_c);
     embd3d_raster_triangle(&g_fb, &a1, &b1, &c1, EMBD3D_CULL_NONE);
-    embd3d_screen_vertex_t a2 = sv(0, 0, 5000, near_c), b2 = sv(100, 0, 5000, near_c), c2 = sv(0, 100, 5000, near_c);
+    embd3d_screen_vertex_t a2 = sv(0, 0, Z_NEAR, near_c), b2 = sv(100, 0, Z_NEAR, near_c), c2 = sv(0, Z_FAR, Z_NEAR, near_c);
     embd3d_raster_triangle(&g_fb, &a2, &b2, &c2, EMBD3D_CULL_NONE);
     CHECK(g_color[20 * FBW + 20] != far_c);
 
@@ -221,24 +229,24 @@ static void test_raster_depth(void) {
     CHECK(g_color[20 * FBW + 20] != far_c);
 
     /* depth must be interpolated inside the triangle, not constant.
-     * The p2 corner carries the largest key (5000), so the key must grow as a
+     * The p2 corner carries the largest key, so the key must grow as a
      * fragment moves towards it. */
     reset_fb();
-    embd3d_screen_vertex_t p0 = sv(0, 0, 100, 0xFFFF);
-    embd3d_screen_vertex_t p1 = sv(100, 0, 100, 0xFFFF);
-    embd3d_screen_vertex_t p2 = sv(0, 100, 5000, 0xFFFF);
+    embd3d_screen_vertex_t p0 = sv(0, 0, Z_FAR, TEST_WHITE);
+    embd3d_screen_vertex_t p1 = sv(100, 0, Z_FAR, TEST_WHITE);
+    embd3d_screen_vertex_t p2 = sv(0, Z_FAR, Z_NEAR, TEST_WHITE);
     embd3d_raster_triangle(&g_fb, &p0, &p1, &p2, EMBD3D_CULL_NONE);
     embd3d_depth_t at_origin_corner = g_depth[2 * FBW + 2];
     embd3d_depth_t midpoint = g_depth[10 * FBW + 40];
     CHECK(midpoint > at_origin_corner);
-    CHECK(at_origin_corner >= 100);    /* never below the smallest vertex key */
+    CHECK(at_origin_corner >= Z_FAR);    /* never below the smallest vertex key */
 }
 
 static void test_raster_cull(void) {
     /* clockwise in NDC (negative area in screen space) */
-    embd3d_screen_vertex_t a = sv(10, 10, 1000, 0xFFFF);
-    embd3d_screen_vertex_t b = sv(110, 10, 1000, 0xFFFF);
-    embd3d_screen_vertex_t c = sv(10, 110, 1000, 0xFFFF);
+    embd3d_screen_vertex_t a = sv(10, 10, Z_MID, TEST_WHITE);
+    embd3d_screen_vertex_t b = sv(110, 10, Z_MID, TEST_WHITE);
+    embd3d_screen_vertex_t c = sv(10, 110, Z_MID, TEST_WHITE);
 
     reset_fb();
     embd3d_raster_triangle(&g_fb, &a, &b, &c, EMBD3D_CULL_BACK);
@@ -255,25 +263,26 @@ static void test_raster_cull(void) {
 static void test_raster_line(void) {
     /* vertical line: the old implementation drew nothing for dx == 0 */
     reset_fb();
-    embd3d_raster_line(&g_fb, 10 * EMBD3D_SUBPIXEL, 10 * EMBD3D_SUBPIXEL, 5000,
-                     10 * EMBD3D_SUBPIXEL, 60 * EMBD3D_SUBPIXEL, 5000, 0xFFFF);
+    embd3d_raster_line(&g_fb, 10 * EMBD3D_SUBPIXEL, 10 * EMBD3D_SUBPIXEL, Z_NEAR,
+                     10 * EMBD3D_SUBPIXEL, 60 * EMBD3D_SUBPIXEL, Z_NEAR, TEST_WHITE);
     CHECK(lit_pixels() >= 50);
 
     /* horizontal line */
     reset_fb();
-    embd3d_raster_line(&g_fb, 10 * EMBD3D_SUBPIXEL, 30 * EMBD3D_SUBPIXEL, 5000,
-                     60 * EMBD3D_SUBPIXEL, 30 * EMBD3D_SUBPIXEL, 5000, 0xFFFF);
+    embd3d_raster_line(&g_fb, 10 * EMBD3D_SUBPIXEL, 30 * EMBD3D_SUBPIXEL, Z_NEAR,
+                     60 * EMBD3D_SUBPIXEL, 30 * EMBD3D_SUBPIXEL, Z_NEAR, TEST_WHITE);
     CHECK(lit_pixels() >= 50);
 
     /* diagonal line stays inside its bounding box */
     reset_fb();
-    embd3d_raster_line(&g_fb, 0, 0, 5000, 100 * EMBD3D_SUBPIXEL, 100 * EMBD3D_SUBPIXEL,
-                     5000, 0xFFFF);
+    embd3d_raster_line(&g_fb, 0, 0, Z_NEAR, 100 * EMBD3D_SUBPIXEL, 100 * EMBD3D_SUBPIXEL,
+                     Z_NEAR, TEST_WHITE);
     CHECK(lit_pixels() >= 100);
     CHECK(lit_pixels() <= 101);
 }
 
 /* ------------------------------------------------------------ pipeline --- */
+#if EMBD3D_ENABLE_FLOAT
 static const embd3d_real_t cube_pos[] = {
     -1, -1, -1,  1, -1, -1,  1,  1, -1,  -1,  1, -1,
     -1, -1,  1,  1, -1,  1,  1,  1,  1,  -1,  1,  1,
@@ -283,7 +292,6 @@ static const embd3d_index_t cube_idx[] = {
     0, 4, 7,  0, 7, 3,  7, 6, 2,  7, 2, 3,  0, 1, 5,  0, 5, 4,
 };
 
-#if EMBD3D_ENABLE_FLOAT
 static void test_pipeline(void) {
     embd3d_mesh_t mesh;
     mesh.positions = cube_pos;
@@ -305,7 +313,7 @@ static void test_pipeline(void) {
     embd3d_mat4_mul(mvp, model, vp);
 
     reset_fb();
-    embd3d_draw_mesh(&g_fb, &mesh, mvp, &model, &ctx);
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, model, &ctx);
     CHECK(lit_pixels() > 500);                 /* the cube covers a good area */
     CHECK(g_color[64 * FBW + 64] != 0);        /* centre is inside the cube */
     CHECK(g_color[2 * FBW + 2] == 0);          /* corner is background */
@@ -314,7 +322,7 @@ static void test_pipeline(void) {
     long all = lit_pixels();
     ctx.flags = EMBD3D_FLAG_CULL_BACK;
     reset_fb();
-    embd3d_draw_mesh(&g_fb, &mesh, mvp, &model, &ctx);
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, model, &ctx);
     long culled = lit_pixels();
     CHECK(culled > 0);
     CHECK(culled <= all);
@@ -322,7 +330,7 @@ static void test_pipeline(void) {
     /* wireframe still produces pixels */
     ctx.flags = EMBD3D_FLAG_WIREFRAME;
     reset_fb();
-    embd3d_draw_mesh(&g_fb, &mesh, mvp, &model, &ctx);
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, model, &ctx);
     CHECK(lit_pixels() > 100);
     CHECK(lit_pixels() < all);                 /* and far fewer than a solid fill */
 }
@@ -383,7 +391,7 @@ static void test_framebuffer(void) {
 #if EMBD3D_COLOR_FORMAT == 0
     /* RGB565 packing */
     CHECK(EMBD3D_RGB(0, 0, 0) == 0x0000);
-    CHECK(EMBD3D_RGB(255, 255, 255) == 0xFFFF);
+    CHECK(EMBD3D_RGB(255, 255, 255) == TEST_WHITE);
     CHECK(EMBD3D_RGB(255, 0, 0) == 0xF800);
     CHECK(EMBD3D_RGB(0, 255, 0) == 0x07E0);
     CHECK(EMBD3D_RGB(0, 0, 255) == 0x001F);
@@ -403,6 +411,7 @@ static void test_framebuffer(void) {
 
 
 /* ------------------------------------------------------- tiered paths --- */
+#if EMBD3D_ENABLE_FLOAT   /* every helper below is only used by the float tests */
 static embd3d_pixel_t g_saved[FBW * FBH];
 
 static void save_image(void) {
@@ -473,6 +482,28 @@ static void build_fx_cube(const embd3d_mesh_t *mesh, embd3d_mesh_fx_t *out,
     embd3d_mat4_to_fx(mvp_fx, mvp);
 }
 #endif
+
+/* Drawing the same mesh twice must produce identical bytes: this catches
+ * uninitialised state in the pipeline, in the depth buffer and in the cache. */
+static void test_determinism(void) {
+    embd3d_mesh_t mesh;
+    embd3d_mat4_t mvp, model;
+    embd3d_render_ctx_t ctx;
+    setup_cube_scene(&mesh, mvp, model, &ctx);
+    ctx.flags |= EMBD3D_FLAG_DEPTH_TINT;
+
+    reset_fb();
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, model, &ctx);
+    long n = lit_pixels();
+    save_image();
+
+    reset_fb();
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, model, &ctx);
+    CHECK(lit_pixels() == n);
+    CHECK(image_diff() == 0);
+}
+
+#endif /* EMBD3D_ENABLE_FLOAT */
 
 static void test_fixed_vs_float(void) {
 #if EMBD3D_ENABLE_FIXED && EMBD3D_ENABLE_FLOAT
@@ -644,12 +675,12 @@ static void test_tiers(void) {
 
     ctx.flags = EMBD3D_FLAG_CULL_BACK | EMBD3D_FLAG_UNLIT;
     reset_fb();
-    embd3d_draw_mesh(&g_fb, &mesh, mvp, &model, &ctx);
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, model, &ctx);
     long flat_colors = distinct_colors();
 
     ctx.flags |= EMBD3D_FLAG_DEPTH_TINT;
     reset_fb();
-    embd3d_draw_mesh(&g_fb, &mesh, mvp, &model, &ctx);
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, model, &ctx);
     long tinted_colors = distinct_colors();
 
     CHECK(flat_colors == 2);          /* background + one fill colour */
@@ -668,6 +699,7 @@ int main(void) {
     printf("raster cull...\n");  test_raster_cull();
     printf("raster line...\n");  test_raster_line();
 #if EMBD3D_ENABLE_FLOAT
+    printf("determinism...\n");  test_determinism();
     printf("pipeline...\n");     test_pipeline();
     printf("clipping...\n");     test_clipping();
 #endif

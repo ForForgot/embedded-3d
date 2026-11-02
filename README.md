@@ -112,7 +112,7 @@ draw function you call.
         embd3d_mesh_t mesh = { verts, tris, 4, 2, EMBD3D_RGB(90, 170, 255) };
 
         embd3d_fb_clear(&fb, EMBD3D_RGB(0, 0, 0));
-        embd3d_draw_mesh(&fb, &mesh, mvp, &model, &ctx);
+        embd3d_draw_mesh(&fb, &mesh, mvp, model, &ctx);
     }
 
 ### The integer pipeline
@@ -179,7 +179,7 @@ Everything is a macro in src/embd3d_config.h, overridable from the build system
 | EMBD3D_COLOR_FORMAT | 0 | 0 = RGB565 (2 B/px), 1 = L8 luminance (1 B/px) |
 | EMBD3D_DEPTH_BITS | 16 | 16 (2 B/px) or 8 (1 B/px) depth levels |
 | EMBD3D_INDEX_TYPE | uint16_t | mesh index type |
-| EMBD3D_SUBPIXEL_BITS | 4 | rasterizer subpixel precision |
+| EMBD3D_SUBPIXEL_BITS | 4 | rasterizer subpixel precision; 4 is safe to ~570 px wide, each extra bit halves that (int32 edge functions) |
 
 Render flags (ctx.flags):
 
@@ -253,7 +253,7 @@ Two things this table does **not** say:
 * Two triangles sharing an edge rasterize to exactly the full quad, i.e. no
   one-pixel cracks. (The 1.x point-in-triangle test used strict inequalities and
   left a hole along every shared edge.)
-* ctest builds and runs the suite once per tier configuration (8 targets), so a
+* ctest builds and runs the suite once per tier configuration (10 targets), so a
   feature combination that stops compiling or passing fails immediately.
 
 ## Status and known limitations

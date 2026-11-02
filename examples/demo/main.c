@@ -209,9 +209,9 @@ int main(int argc, char **argv) {
 #if EMBD3D_ENABLE_FLOAT
         if (!drawn) {
             if (use_cache) {
-                embd3d_draw_mesh_cached(&fb, &mesh, mvp, &model, &ctx, &cache);
+                embd3d_draw_mesh_cached(&fb, &mesh, mvp, model, &ctx, &cache);
             } else {
-                embd3d_draw_mesh(&fb, &mesh, mvp, &model, &ctx);
+                embd3d_draw_mesh(&fb, &mesh, mvp, model, &ctx);
             }
         }
 #endif

@@ -1,0 +1,42 @@
+name: build-and-test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Test (every tier configuration)
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Render a frame
+        run: ./build/embd3d_demo out.ppm --sphere
+        if: runner.os != 'Windows'
+
+  strict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Warnings are errors
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror"
+          cmake --build build -j 4
+      - name: C++ consumer still links
+        run: |
+          printf '#include <embd3d.h>\nint main(){ embd3d_mat4_t m; embd3d_mat4_identity(m); return 0; }\n' > /tmp/t.cpp
+          g++ -std=c++11 -Isrc /tmp/t.cpp build/libembd3d.a -lm -o /tmp/t && /tmp/t

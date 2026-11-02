@@ -82,7 +82,7 @@ static void emit_tri(embd3d_framebuffer_t *fb, const embd3d_screen_vertex_t *sv,
 #if EMBD3D_ENABLE_LIGHTING && EMBD3D_ENABLE_FLOAT
 static embd3d_color_t shade_face(const embd3d_render_ctx_t *ctx, embd3d_color_t base,
                                const embd3d_real_t *p0, const embd3d_real_t *p1,
-                               const embd3d_real_t *p2, const embd3d_mat4_t *model) {
+                               const embd3d_real_t *p2, const embd3d_mat4_t model) {
     embd3d_vec3_t a = { p0[0], p0[1], p0[2] };
     embd3d_vec3_t b = { p1[0], p1[1], p1[2] };
     embd3d_vec3_t c = { p2[0], p2[1], p2[2] };
@@ -91,7 +91,7 @@ static embd3d_color_t shade_face(const embd3d_render_ctx_t *ctx, embd3d_color_t 
     embd3d_vec3_t nrm = embd3d_vec3_cross(&e1, &e2);
 
     if (model != 0) {
-        embd3d_mat4_transform_dir(&nrm, *model);
+        embd3d_mat4_transform_dir(&nrm, model);
     }
     nrm = embd3d_vec3_normalize(&nrm);
 
@@ -285,7 +285,7 @@ static int clip_project_f(const clip_f_t *in, const embd3d_framebuffer_t *fb,
 }
 
 static void draw_f_impl(embd3d_framebuffer_t *fb, const embd3d_mesh_t *mesh,
-                        const embd3d_mat4_t mvp, const embd3d_mat4_t *model,
+                        const embd3d_mat4_t mvp, const embd3d_mat4_t model,
                         const embd3d_render_ctx_t *ctx, embd3d_vertex_cache_t *cache) {
     if (mesh == 0 || mesh->indices == 0 || mesh->positions == 0 ||
         mesh->triangle_count == 0) {
@@ -298,6 +298,7 @@ static void draw_f_impl(embd3d_framebuffer_t *fb, const embd3d_mesh_t *mesh,
     const int unlit = (ctx->flags & EMBD3D_FLAG_UNLIT) != 0;
 #else
     const int unlit = 1;
+    (void)model;                    /* lighting is compiled out: no normal work */
 #endif
     const embd3d_cull_t cull =
         (!wire && (ctx->flags & EMBD3D_FLAG_CULL_BACK)) ? EMBD3D_CULL_BACK : EMBD3D_CULL_NONE;
@@ -749,13 +750,13 @@ void embd3d_vertex_cache_init(embd3d_vertex_cache_t *cache, void *data, uint16_t
 
 #if EMBD3D_ENABLE_FLOAT
 void embd3d_draw_mesh(embd3d_framebuffer_t *fb, const embd3d_mesh_t *mesh,
-                    const embd3d_mat4_t mvp, const embd3d_mat4_t *model,
+                    const embd3d_mat4_t mvp, const embd3d_mat4_t model,
                     const embd3d_render_ctx_t *ctx) {
     draw_f_impl(fb, mesh, mvp, model, ctx, 0);
 }
 
 void embd3d_draw_mesh_cached(embd3d_framebuffer_t *fb, const embd3d_mesh_t *mesh,
-                           const embd3d_mat4_t mvp, const embd3d_mat4_t *model,
+                           const embd3d_mat4_t mvp, const embd3d_mat4_t model,
                            const embd3d_render_ctx_t *ctx,
                            embd3d_vertex_cache_t *cache) {
     draw_f_impl(fb, mesh, mvp, model, ctx, cache);
