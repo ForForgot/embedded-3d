@@ -36,6 +36,14 @@ static int g_failures = 0;
 
 #define FBW 128
 #define FBH 128
+
+/* The suite renders into a FBW px wide buffer and the rasterizer's edge
+ * functions are int32: 4.5 * FBW * 2^bits must stay below 2^31, which caps
+ * the subpixel precision at 5 bits here.  Without this guard an oversized
+ * value fails as a mysterious "nothing was drawn". */
+#if EMBD3D_SUBPIXEL_BITS > 5
+#error "the 128 px test viewport needs EMBD3D_SUBPIXEL_BITS <= 5"
+#endif
 static embd3d_pixel_t g_color[FBW * FBH];
 static embd3d_depth_t g_depth[FBW * FBH];
 static embd3d_framebuffer_t g_fb;

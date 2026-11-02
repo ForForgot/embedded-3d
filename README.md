@@ -1,83 +1,20 @@
-# embedded-3d
-
-A tiny portable **3D rasterizer for micro controllers**, in plain C99.
-No malloc, no dependencies, and a Q16.16 pipeline that avoids floating point
-entirely for the parts that run per vertex and per pixel.
-
-![embedded-3d rendering a cube and a sphere](docs/images/demo.png)
-
-*128x128, RGB565, 16 bit depth, back face culling, flat shading — rendered by examples/demo.*
-
-## Origin
-
-This project started as a rewrite of [ol3d](https://github.com/ForForgot/ol3d)
-1.x, an earlier take on the same idea: a 3D pipeline small enough to push a
-spinning low-poly model to an OLED from an 8 bit MCU. **No code is shared with
-it** - the implementation, the API and the build are new - but the goal is the
-same, and the table below is why the rewrite happened.
-
-| | ol3d 1.x | embedded-3d |
-|---|---|---|
-| triangle fill | point-in-triangle test per pixel (2 cross products) | integer edge functions, incremental |
-| depth | 8 bit, constant per triangle, inverted compare | 16 bit, 1/w interpolated per fragment |
-| clipping | none | near plane, or the full 6 plane frustum |
-| culling | none | screen space back face culling |
-| vertex transform | double, 3x per triangle | float or Q16.16, optional shared vertex cache |
-| colour | RGB888, 3 B/px | RGB565, 2 B/px (+ L8 option) |
-| mesh | long[] with a 0 sentinel | indexed triangle list with a count |
-
-## Tiers
-
-A tier is a named preset of render flags plus a choice of draw interface. It is
-not a separate build: the same library serves all three, and the feature you do
-not need is compiled out.
-
-| tier | draw with | transform | depth | clipping | shading | typical target |
-|---|---|---|---|---|---|---|
-| MINIMAL | embd3d_draw_mesh_fx | Q16.16 | 8 bit | near | depth tint (no lighting) | AVR, 8051, Cortex-M0 |
-| BALANCED | embd3d_draw_mesh | float | 16 bit | near | per face | Cortex-M3/M4, ESP32 |
-| QUALITY | embd3d_draw_mesh_cached | float | 16 bit | 6 planes | per face | Cortex-M4F/M7, RP2040, ESP32-S3 |
-
-![ol3d 1.x vs the three tiers](docs/images/tiers-vs-1x.png)
-
-*The same cube, same camera: 1.x (framing compensated so only the rendering
-differs), MINIMAL, BALANCED, QUALITY. 1.x loses the shape to its broken depth
-buffer and 8 bit colour truncation; MINIMAL is geometrically correct but flat;
-BALANCED and QUALITY are identical here because nothing needs clipping.*
-
-    embd3d_render_ctx_t ctx;
-    embd3d_render_ctx_init_tier(&ctx, EMBD3D_TIER_QUALITY, 0.5f, 30.0f);
-
-    /* ask the library which interface this tier prefers on this build */
-    if (embd3d_tier_precision(EMBD3D_TIER_MINIMAL) == EMBD3D_PRECISION_FIXED) {
-        embd3d_mat4_fx_t mvp_fx;
-        embd3d_mat4_to_fx(mvp_fx, mvp);
-        embd3d_draw_mesh_fx(&fb, &mesh_fx, mvp_fx, &ctx);
-    }
-
-Tiers are a starting point, not a cage: every flag can be changed afterwards
-(CULL_BACK, WIREFRAME, FULL_CLIP, UNLIT), and the precision is chosen by which
-draw function you call.
-
-## Layout
-
-    src/                     the library (flat, so Arduino picks it up as-is)
-      embd3d.h                 umbrella header
-      embd3d_config.h          compile time configuration and tier switches
-      embd3d_vec3.{h,c}        vector math
-      embd3d_mat4.{h,c}        4x4 row-vector matrices (float)
-      embd3d_fixed.{h,c}       Q16.16 matrices and mesh conversion
-      embd3d_framebuffer.{h,c} pixel format, clear, RGB888 export
-      embd3d_raster.{h,c}      triangle / line rasterizer with depth test
-      embd3d_mesh.h            indexed triangle list (float and fixed)
-      embd3d_render.{h,c}      tiers, clipping, projection, shading, cache
+    src/                      the library (flat, so Arduino picks it up as-is)
+      embd3d.h                umbrella header
+      embd3d_config.h         compile time configuration and tier switches
+      embd3d_vec3.{h,c}       vector math
+      embd3d_mat4.{h,c}       4x4 row-vector matrices (float)
+      embd3d_fixed.{h,c}      Q16.16 matrices and mesh conversion
+      embd3d_framebuffer.{h,c}pixel format, clear, RGB888 export
+      embd3d_raster.{h,c}     triangle / line rasterizer with depth test
+      embd3d_mesh.h           indexed triangle list (float and fixed)
+      embd3d_render.{h,c}     tiers, clipping, projection, shading, cache
     examples/
-      demo/                  headless PPM renderer (cube or sphere, float or fx)
-      arduino/embd3d_spin/     the same pipeline on an Arduino + OLED
-    tests/test_embd3d.c        unit tests, built once per tier by CTest
-    bench/                   A/B benchmark against ol3d 1.x (sources not shipped)
-    docs/DESIGN.md           why the implementation looks like it does
-    docs/MIGRATION.md        porting table from ol3d 1.x
+      demo/                   headless PPM renderer (cube or sphere, float or fx)
+      arduino/embd3d_spin/    the same pipeline on an Arduino + OLED
+    tests/test_embd3d.c       unit tests, built once per tier by CTest
+    bench/                    A/B benchmark against ol3d 1.x (sources not shipped)
+    docs/DESIGN.md            why the implementation looks like it does
+    docs/PORTING-FROM-OL3D.md API map and behavioural differences
 
 ## Quick start
 
@@ -274,5 +211,7 @@ Two things this table does **not** say:
 
 ## License
 
-No license file was ever added to this repository; treat it as "all rights
-reserved by the author" until one is chosen.
+MIT - see [LICENSE](LICENSE). Copyright (c) 2026 ForForgot.
+
+This is an independent implementation: no source code from ol3d 1.x is
+included, only the goal and a few conventions are shared (see Origin).
