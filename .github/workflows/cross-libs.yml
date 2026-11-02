@@ -1,0 +1,122 @@
+name: cross libraries
+
+# Builds static libraries with the real embedded toolchains and attaches them to
+# the GitHub release when a v* tag is pushed.  Also runnable by hand
+# (workflow_dispatch) to check the toolchains without cutting a release.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  arm:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cortex-m0
+            tier: minimal
+            flags: "-mcpu=cortex-m0 -mthumb"
+            defs: "-DEMBD3D_ENABLE_FLOAT=0 -DEMBD3D_ENABLE_LIGHTING=0 -DEMBD3D_DEPTH_BITS=8"
+          - name: cortex-m3
+            tier: balanced
+            flags: "-mcpu=cortex-m3 -mthumb"
+            defs: ""
+          - name: cortex-m4f
+            tier: balanced
+            flags: "-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard"
+            defs: ""
+          - name: cortex-m7
+            tier: balanced
+            flags: "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard"
+            defs: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-arm-none-eabi binutils-arm-none-eabi
+
+      - name: Build
+        run: |
+          set -eu
+          VER=$(sed -n 's/^version=//p' library.properties)
+          mkdir -p dist obj
+          for f in src/*.c; do
+            arm-none-eabi-gcc -std=c99 -Os -ffunction-sections -fdata-sections \
+              ${{ matrix.flags }} ${{ matrix.defs }} -Isrc \
+              -c "$f" -o "obj/$(basename "$f" .c).o"
+          done
+          LIBN="embd3d-$VER-${{ matrix.name }}-${{ matrix.tier }}-Os"
+          arm-none-eabi-ar rcs "dist/lib$LIBN.a" obj/*.o
+          echo "--- $LIBN"
+          arm-none-eabi-size "dist/lib$LIBN.a"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lib-${{ matrix.name }}
+          path: dist/*.a
+
+  avr:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mcu: [atmega328p, atmega2560]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-avr avr-libc binutils-avr
+
+      - name: Build
+        run: |
+          set -eu
+          VER=$(sed -n 's/^version=//p' library.properties)
+          mkdir -p dist obj
+          for f in src/*.c; do
+            avr-gcc -std=c99 -Os -ffunction-sections -fdata-sections \
+              -mmcu=${{ matrix.mcu }} \
+              -DEMBD3D_ENABLE_FLOAT=0 -DEMBD3D_ENABLE_LIGHTING=0 \
+              -DEMBD3D_DEPTH_BITS=8 -DEMBD3D_COLOR_FORMAT=1 \
+              -Isrc -c "$f" -o "obj/$(basename "$f" .c).o"
+          done
+          LIBN="embd3d-$VER-avr-${{ matrix.mcu }}-minimal-Os"
+          avr-ar rcs "dist/lib$LIBN.a" obj/*.o
+          echo "--- $LIBN"
+          avr-size -A "dist/lib$LIBN.a" | tail -n 2
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lib-avr-${{ matrix.mcu }}
+          path: dist/*.a
+
+  release:
+    needs: [arm, avr]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd dist
+          ls -l
+          sha256sum *.a > SHA256SUMS-cross.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.a
+            dist/SHA256SUMS-cross.txt
