@@ -401,10 +401,13 @@ typedef struct {
 
 static inline void xform_fx(clip_fx_t *o, const embd3d_fx_t *p, const embd3d_mat4_fx_t m) {
     const int64_t x = p[0], y = p[1], z = p[2];
-    o->x = (embd3d_fx_t)((x * m[0] + y * m[4] + z * m[8] + ((int64_t)m[12] << 16)) >> 16);
-    o->y = (embd3d_fx_t)((x * m[1] + y * m[5] + z * m[9] + ((int64_t)m[13] << 16)) >> 16);
-    o->z = (embd3d_fx_t)((x * m[2] + y * m[6] + z * m[10] + ((int64_t)m[14] << 16)) >> 16);
-    o->w = (embd3d_fx_t)((x * m[3] + y * m[7] + z * m[11] + ((int64_t)m[15] << 16)) >> 16);
+    /* The homogeneous 1 term is m[3..15] << 16; written as a multiply because
+     * matrix elements are signed and shifting a negative value is undefined. */
+    const int64_t ONE = 65536;
+    o->x = (embd3d_fx_t)((x * m[0] + y * m[4] + z * m[8] + (int64_t)m[12] * ONE) >> 16);
+    o->y = (embd3d_fx_t)((x * m[1] + y * m[5] + z * m[9] + (int64_t)m[13] * ONE) >> 16);
+    o->z = (embd3d_fx_t)((x * m[2] + y * m[6] + z * m[10] + (int64_t)m[14] * ONE) >> 16);
+    o->w = (embd3d_fx_t)((x * m[3] + y * m[7] + z * m[11] + (int64_t)m[15] * ONE) >> 16);
 }
 
 static void project_fx(const clip_fx_t *v, const embd3d_framebuffer_t *fb,
@@ -475,7 +478,7 @@ static int clip_near_fx(const clip_fx_t *in, clip_fx_t *out) {
         }
         if ((dc >= 0) != (dn >= 0)) {
             /* t = dc / (dc - dn) in Q16.16 */
-            embd3d_fx_t t = (embd3d_fx_t)(((int64_t)dc << 16) / (dc - dn));
+            embd3d_fx_t t = (embd3d_fx_t)(((int64_t)dc * 65536) / (dc - dn));
             out[n].x = cur->x + (embd3d_fx_t)(((int64_t)(nxt->x - cur->x) * t) >> 16);
             out[n].y = cur->y + (embd3d_fx_t)(((int64_t)(nxt->y - cur->y) * t) >> 16);
             out[n].z = cur->z + (embd3d_fx_t)(((int64_t)(nxt->z - cur->z) * t) >> 16);
@@ -519,7 +522,7 @@ static int clip_half_fx(const clip_fx_t *in, int n, const embd3d_fx_t pl[4],
             out[m++] = *cur;
         }
         if ((dc >= 0) != (dn >= 0)) {
-            embd3d_fx_t t = (embd3d_fx_t)(((int64_t)dc << 16) / (dc - dn));
+            embd3d_fx_t t = (embd3d_fx_t)(((int64_t)dc * 65536) / (dc - dn));
             out[m].x = cur->x + (embd3d_fx_t)(((int64_t)(nxt->x - cur->x) * t) >> 16);
             out[m].y = cur->y + (embd3d_fx_t)(((int64_t)(nxt->y - cur->y) * t) >> 16);
             out[m].z = cur->z + (embd3d_fx_t)(((int64_t)(nxt->z - cur->z) * t) >> 16);

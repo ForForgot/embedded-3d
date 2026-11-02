@@ -33,7 +33,11 @@ static inline embd3d_fx_t embd3d_fx_from_int(int v) {
 static inline embd3d_real_t embd3d_fx_to_real(embd3d_fx_t v) {
     return (embd3d_real_t)v / (embd3d_real_t)EMBD3D_FX_ONE;
 }
-/* Q16.16 * Q16.16 -> Q16.16 */
+/* Q16.16 * Q16.16 -> Q16.16.
+ * The right shift of a possibly negative product is implementation defined in
+ * C99, but every compiler for every target this library runs on implements it
+ * as an arithmetic shift, and it is the operation we want: a division would
+ * round towards zero instead of flooring, which would bias the result. */
 static inline embd3d_fx_t embd3d_fx_mul(embd3d_fx_t a, embd3d_fx_t b) {
     return (embd3d_fx_t)(((int64_t)a * (int64_t)b) >> 16);
 }

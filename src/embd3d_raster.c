@@ -103,21 +103,24 @@ void embd3d_raster_triangle(embd3d_framebuffer_t *fb,
                  ((int64_t)ax * by - (int64_t)bx * ay) * dc;
 
     /* Per pixel step, i.e. per EMBD3D_SUBPIXEL subpixel units. */
-    int64_t gx = (ad << (D_FRAC + S_BITS)) / area;
-    int64_t gy = (bd << (D_FRAC + S_BITS)) / area;
+    /* Multiplying by a power of two rather than shifting: a left shift of a
+     * negative value is undefined behaviour, and ad/bd are signed. */
+    const int64_t one_pixel = (int64_t)1 << (D_FRAC + S_BITS);
+    int64_t gx = (ad * one_pixel) / area;
+    int64_t gy = (bd * one_pixel) / area;
     if (gx > (int64_t)0x0FFFFFFF) gx = (int64_t)0x0FFFFFFF;
     if (gx < -(int64_t)0x0FFFFFFF) gx = -(int64_t)0x0FFFFFFF;
     if (gy > (int64_t)0x0FFFFFFF) gy = (int64_t)0x0FFFFFFF;
     if (gy < -(int64_t)0x0FFFFFFF) gy = -(int64_t)0x0FFFFFFF;
 
-    int32_t px = xmin << S_BITS;
-    int32_t py = ymin << S_BITS;
+    int32_t px = xmin * (int32_t)EMBD3D_SUBPIXEL;
+    int32_t py = ymin * (int32_t)EMBD3D_SUBPIXEL;
 
     int32_t e0 = a0 * px + b0 * py + c0;
     int32_t e1 = a1 * px + b1 * py + c1;
     int32_t e2 = a2 * px + b2 * py + c2;
 
-    int64_t base64 = ((ad * px + bd * py + cd) << D_FRAC) / area;
+    int64_t base64 = ((ad * px + bd * py + cd) * (int64_t)(1 << D_FRAC)) / area;
     int32_t drow = (int32_t)base64;
     int32_t dzdx = (int32_t)gx;
     int32_t dzdy = (int32_t)gy;
@@ -166,13 +169,16 @@ void embd3d_raster_line(embd3d_framebuffer_t *fb,
 
     /* DDA over the major axis, 8 extra fractional bits.  Handles every slope,
      * unlike the old x-only stepping version which dropped vertical edges. */
-    int32_t xs = (dx << 8) / steps;
-    int32_t ys = (dy << 8) / steps;
-    int32_t zs = (((int32_t)z1 - (int32_t)z0) << 8) / steps;
+    /* 8 extra fractional bits; multiplication, not shift, because the line can
+     * start at a negative coordinate. */
+    const int32_t F8 = 256;
+    int32_t xs = (dx * F8) / steps;
+    int32_t ys = (dy * F8) / steps;
+    int32_t zs = (((int32_t)z1 - (int32_t)z0) * F8) / steps;
 
-    int32_t x = x0 << 8;
-    int32_t y = y0 << 8;
-    int32_t z = (int32_t)z0 << 8;
+    int32_t x = x0 * F8;
+    int32_t y = y0 * F8;
+    int32_t z = (int32_t)z0 * F8;
     int32_t w = (int32_t)fb->width;
     int32_t h = (int32_t)fb->height;
 
