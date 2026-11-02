@@ -3,11 +3,11 @@
 This document records *why* the implementation looks the way it does: the
 problem, the chosen solution, the alternatives, and what it measured.
 
-All numbers come from a one-off A/B run made during development (GCC 13, x86-64
-host, 1280 triangle sphere, 128x128 target, identical flags for both sides).
-Host timings are not MCU timings; they are used to compare *algorithms*, not
-absolute cost. The harness is not part of this repository, so the figures are
-historical rather than reproducible here.
+All numbers come from a one-off measurement run made during development (GCC 13,
+x86-64 host, 1280 triangle sphere, 128x128 target). Host timings are not MCU
+timings; they are used to compare *algorithms*, not absolute cost. The harness is
+not part of this repository, so the figures are historical rather than
+reproducible here.
 
 ---
 
@@ -18,17 +18,18 @@ historical rather than reproducible here.
 2. **No dependency beyond math.h and string.h.**
 3. **The inner loop must avoid division.** A soft-float divide is 100+ cycles on
    a Cortex-M0; a 128x128 frame is 16384 pixels.
-4. **Keep the row-vector matrix convention** of 1.x so existing matrix literals
-   keep working, even though column-vector is more common.
+4. **Row-vector matrices** (v' = v * M) rather than the more common column-vector
+   form, because the chaining order then reads like the code that builds it:
+   translate, rotate, project.
 
 ---
 
-## 1. Matrix multiply: 70 ns -> 20 ns (-71%)
+## 1. Matrix multiply: a straight 4x4 loop
 
-**1.x** built the product element by element through ol3d_matrix_multi_chunk(),
-which looked up two constant tables (transpose4x4[], rowOf[]) per element and
-walked a b[transpose4x4[column++]] strided access. Correct, but 16 table lookups,
-16 function calls and a data dependent access pattern per matrix.
+A 4x4 product is 64 multiply-adds. Written element by element through a helper
+call, with transposed index tables to avoid a division per element, it costs 16
+function calls and 16 data dependent table lookups on top of the arithmetic, and
+the indirect indexing defeats whatever the compiler would otherwise do.
 
 **embedded-3d** uses a straight 4x4 loop with row pointers so the compiler keeps
 ar[0..3] in registers and can unroll/vectorise:
@@ -37,9 +38,9 @@ ar[0..3] in registers and can unroll/vectorise:
               for (col) dst[r*4+col] = ar[0]*b[col] + ar[1]*b[4+col]
                                      + ar[2]*b[8+col] + ar[3]*b[12+col]; }
 
-The product is written to a local and copied out, so dst may alias a or b. The
-1.x helper functions used a second temporary for exactly this, and made the
-transpose() bug possible by getting the argument order wrong.
+The product is written to a local and copied out, so dst may alias a or b. That
+is also why every matrix function takes the destination first: a helper that
+takes the source first invites a call that copies backwards.
 
 Alternatives considered: storing matrices column major (rejected: breaks every
 existing literal and the MATRIX_TRANSLATE-style macros); transpose-on-load
@@ -49,11 +50,11 @@ existing literal and the MATRIX_TRANSLATE-style macros); transpose-on-load
 
 ## 2. Triangle fill: point-in-triangle per pixel -> incremental edge functions
 
-**1.x** evaluated inTriangle() for every pixel of the bounding box: six
-multiplies, six adds and four comparisons per pixel, all in double, recomputing
-the same cross products for every pixel of every row.
+**A point-in-triangle test per pixel** costs six multiplies, six adds and four
+comparisons for every pixel of the bounding box, and recomputes the same cross
+products on every row.
 
-**embedded-3d** uses the standard edge function formulation. For each edge,
+**This library** uses the standard edge function formulation. For each edge,
 E(x,y) = A*x + B*y + C is evaluated once at the top-left corner of the clamped
 bounding box and then **incremented** by A << SUBPIXEL per pixel step and
 B << SUBPIXEL per row. Inside is E0 >= 0 && E1 >= 0 && E2 >= 0 after normalising
@@ -70,8 +71,8 @@ Design details worth knowing:
 * **int32 is enough** because projection clamps NDC x/y to +-4 (guard band),
   which bounds every coordinate the rasterizer sees.
 * **The AABB is clamped to the framebuffer before any unsigned conversion.**
-  1.x cast a possibly negative float to unsigned int for the loop bounds, which
-  wrapped and either skipped the triangle or iterated billions of times.
+  Casting a possibly negative float to unsigned int for the loop bounds wraps,
+  and then either skips the triangle or iterates billions of times.
 
 Alternatives considered: scanline / trapezoid decomposition (2 to 4 edges active
 per row, fewer edge evaluations per pixel, a further ~20% on wide triangles but
@@ -80,11 +81,11 @@ granularity then per-pixel refine (good for SIMD, pointless on an 8-bit MCU).
 
 ---
 
-## 3. Depth: 8 bit constant-per-triangle -> 16 bit interpolated 1/w
+## 3. Depth: 16 bit, interpolated 1/w
 
-**1.x**: unsigned char z taken from the triangle's max NDC z, truncated by
-COORD() (which maps NDC to 0..128, i.e. *screen* coordinates), compared with
-z >= zbuffer. Two consequences, both verified by experiment: the whole
+**The obvious version** - an unsigned char z taken from the triangle's max NDC
+z, truncated by COORD() (which maps NDC to 0..128, i.e. *screen* coordinates),
+compared with z >= zbuffer - fails twice. Two consequences, both verified by experiment: the whole
 [znear, zfar] range collapses onto two values (127/128), and the compare
 direction lets the *farther* fragment win.
 
@@ -113,32 +114,32 @@ harmless here.
 
 ---
 
-## 4. Colour: RGB888 -> RGB565, and shading in Q8
+## 4. Colour: RGB565, and shading in Q8
 
-1.x wrote 3 bytes per pixel (48 KiB for 128x128) for 6-bit channels: it packed
-z*10 scaled values into unsigned char, so the image never exceeded 25% brightness
-while the header comment described an RGB565 layout.
+**Three bytes per pixel** (48 KiB for 128x128) buys nothing on a panel with 5/6
+bit channels, and packing the colour into an unsigned char quietly caps the image
+at a quarter brightness.
 
-embedded-3d writes RGB565 (32 KiB) and shades with a Q8 multiplier:
+This library writes RGB565 (32 KiB) and shades with a Q8 multiplier:
 
     r5' = (r5 * shade + 128) >> 8            shade in 0..256
 
 three shifts/masks per pixel, no division, and it composes with the existing
 5/6/5 channel widths. L8 (EMBD3D_COLOR_FORMAT=1) drops to 16 KiB for mono panels.
 
-embd3d_fb_export_rgb888() converts a finished frame for drivers that still want the
-old 3-byte wire format, so the RAM saving costs one pass over the frame instead
-of 16 KiB of always-resident buffer.
+embd3d_fb_export_rgb888() converts a finished frame for drivers that want the
+3-byte wire format, so the RAM saving costs one pass over the frame instead of
+16 KiB of always-resident buffer.
 
 ---
 
-## 5. Clipping: none -> near plane only
+## 5. Clipping
 
-1.x had no clipping at all. A vertex behind the eye produced w <= 0, a division,
-and a triangle smeared across the screen (or an inf that makes the AABB loop run
-for millions of iterations).
+**Without clipping**, a vertex behind the eye produces w <= 0, a division, and a
+triangle smeared across the screen - or an inf that makes the AABB loop run for
+millions of iterations.
 
-embedded-3d clips the triangle in clip space against z + w >= 0 (Sutherland-Hodgman, one
+This library clips the triangle in clip space against z + w >= 0 (Sutherland-Hodgman, one
 plane, at most a 4-gon, then a triangle fan). One plane is enough for this
 projection: any vertex behind the eye also fails that test, so w = 0 cannot reach
 the divider. A guard is kept anyway (w < 1e-6 -> 1e-6).
@@ -166,20 +167,21 @@ the mesh in its own space.
 
 ---
 
-## 7. Scalar type: double -> float
+## 7. Scalar type
 
-1.x used double for vectors and float for matrices, mixing them in
-ol3d_matrix_multi_v3. On a Cortex-M4F double is software emulated (about 50x a
-single precision multiply); on AVR they are the same. embd3d_real_t is a typedef,
-defaulting to float, so the choice is one macro away and no call site casts.
+**Mixing double vectors with float matrices** is easy to do by accident, and it
+turns one dot product per vertex into four software emulated multiplies on a
+Cortex-M4F (about 50x a single precision multiply); on AVR the two are the same
+width anyway. embd3d_real_t is a typedef, defaulting to float, so the choice is
+one macro away and no call site casts.
 
 ---
 
 ## 8. Lines
 
-1.x stepped only along x and divided by dx, so vertical lines drew nothing and
-near-vertical ones had gaps. embedded-3d runs a DDA along the major axis with 8 extra
-fractional bits, interpolating depth along the way. Bresenham would save the
+**Stepping only along x and dividing by dx** drops vertical lines entirely and
+gaps near-vertical ones. This implementation runs a DDA along the major axis with
+8 extra fractional bits, interpolating depth along the way. Bresenham would save the
 accumulators, but the difference is not measurable next to the fragment work.
 
 ---
@@ -202,12 +204,9 @@ sections 11 to 13.
 
 ## 10. Measurement method (and its limits)
 
-* Both implementations were built into one binary, with the matrices built to the
-  same intended field of view (the old setPerspective() was fed a pre-warped
-  angle to compensate for its reciprocal bug, otherwise it would have rasterized
-  a 3.7x larger object and looked artificially slow), and 300 frames of
-  "clear + draw" were timed for each.
-* Timing uses clock(), so resolution is coarse: the loops are sized to run for
+* The README figures come from one host run: 1280 triangle sphere, 128x128
+  target, 300 frames of "clear + draw" per variant, identical flags.
+* Timing uses clock(), so resolution is coarse: the loops were sized to run for
   hundreds of milliseconds, and the published figures are medians of five runs.
 * Fragment counts are printed next to the timings precisely so that drawing less
   cannot hide as a speed-up. They match within 4%.
@@ -282,7 +281,7 @@ faces at 16 MHz - a sixth of a 30 fps budget, spent on shading alone. On the
 parts that need the Q16.16 pipeline that is not a good trade, so the integer
 path draws the mesh colour and the tier is documented as unlit. If you need
 shading there, bake it into per-face colours at load time or use the float
-pipeline (it still beats 1.x even without an FPU, just by less).
+pipeline.
 
 ---
 

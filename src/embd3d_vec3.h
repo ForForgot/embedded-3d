@@ -22,8 +22,8 @@ static inline embd3d_vec3_t embd3d_vec3_make(embd3d_real_t x, embd3d_real_t y, e
     return v;
 }
 
-/* Real dot product.  NOTE: the old ol3d_vector_dot() returned the
- * component-wise (Hadamard) product; that behaviour now has its own name. */
+/* Real dot product.  The component-wise (Hadamard) product has its own name,
+ * embd3d_vec3_hadamard(), so the two cannot be confused at a call site. */
 embd3d_real_t embd3d_vec3_dot(const embd3d_vec3_t *a, const embd3d_vec3_t *b);
 embd3d_vec3_t embd3d_vec3_hadamard(const embd3d_vec3_t *a, const embd3d_vec3_t *b);
 embd3d_real_t embd3d_vec3_length(const embd3d_vec3_t *a);

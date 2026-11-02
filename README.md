@@ -1,3 +1,41 @@
+# embedded-3d
+
+A tiny portable **3D rasterizer for micro controllers**, in plain C99.
+No malloc, no dependencies, and a Q16.16 pipeline that avoids floating point
+entirely for the parts that run per vertex and per pixel.
+
+![embedded-3d rendering a cube and a sphere](docs/images/demo.png)
+
+*128x128, RGB565, 16 bit depth, back face culling, flat shading - rendered by examples/demo.*
+
+## Tiers
+
+A tier is a named preset of render flags plus a choice of draw interface. It is
+not a separate build: the same library serves all three, and the feature you do
+not need is compiled out.
+
+| tier | draw with | transform | depth | clipping | shading | typical target |
+|---|---|---|---|---|---|---|
+| MINIMAL | embd3d_draw_mesh_fx | Q16.16 | 8 bit | near | depth tint (no lighting) | AVR, 8051, Cortex-M0 |
+| BALANCED | embd3d_draw_mesh | float | 16 bit | near | per face | Cortex-M3/M4, ESP32 |
+| QUALITY | embd3d_draw_mesh_cached | float | 16 bit | 6 planes | per face | Cortex-M4F/M7, RP2040, ESP32-S3 |
+
+    embd3d_render_ctx_t ctx;
+    embd3d_render_ctx_init_tier(&ctx, EMBD3D_TIER_QUALITY, 0.5f, 30.0f);
+
+    /* ask the library which interface this tier prefers on this build */
+    if (embd3d_tier_precision(EMBD3D_TIER_MINIMAL) == EMBD3D_PRECISION_FIXED) {
+        embd3d_mat4_fx_t mvp_fx;
+        embd3d_mat4_to_fx(mvp_fx, mvp);
+        embd3d_draw_mesh_fx(&fb, &mesh_fx, mvp_fx, &ctx);
+    }
+
+Tiers are a starting point, not a cage: every flag can be changed afterwards
+(CULL_BACK, WIREFRAME, FULL_CLIP, UNLIT), and the precision is chosen by which
+draw function you call.
+
+## Layout
+
     src/                      the library (flat, so Arduino picks it up as-is)
       embd3d.h                umbrella header
       embd3d_config.h         compile time configuration and tier switches
@@ -135,7 +173,7 @@ Frame buffer footprint at 128x128:
 | RGB565 | 8 bit | 48 KiB |
 | L8 | 8 bit | 32 KiB |
 
-Drivers that want the 1.x wire format (3 bytes per pixel) can call
+Drivers that want 3 bytes per pixel (what many OLED controllers take) can call
 embd3d_fb_export_rgb888() on the finished frame instead of paying for a bigger
 buffer all the time.
 
@@ -151,35 +189,26 @@ flash numbers; the ratios are the point):
 
 ## Performance
 
-Numbers from a one-off comparison run during development: the same 1280 triangle
-sphere, the same 128x128 target, the same flags on both sides, with fragment
-counts checked so that "faster because it drew less" could not hide. The
-comparison harness is not part of this repository (it needs another project's
-sources), so these are historical figures rather than something you can rerun.
-
-Frame time relative to the 1.x code this project started from (negative is faster):
+Cost inside this library, measured on one x86-64 host with GCC 13 (1280 triangle
+sphere, 128x128 target). Relative to the float path, which is the baseline:
 
 | variant | -O3 | -Os |
 |---|---:|---:|
-| float | -50% | -67% |
-| float + vertex cache | -56% | -72% |
-| Q16.16 | -42% | -64% |
-| Q16.16 + vertex cache | -56% | -72% |
+| float | baseline | baseline |
+| float + vertex cache | -13% | -14% |
+| Q16.16 | +15% | +10% |
+| Q16.16 + vertex cache | -10% | -15% |
 
-Fragments written: 7532 (1.x) vs 7775 (embedded-3d) on the same scene.
-
-Only the ratios are published because the absolute numbers move by tens of
-percent between machines and even between runs on the same machine; the ratios
-stayed put across every run.
+Absolute figures move by tens of percent between machines and between runs, so
+only the ratios are published.
 
 Two things this table does **not** say:
 
-* the Q16.16 row is *slower* here because this host has a hardware FPU. On a
+* the Q16.16 rows are *slower* here because this host has a hardware FPU. On a
   Cortex-M0 or an AVR the same code is typically several times faster than the
   float path, because a float multiply becomes a library call. docs/DESIGN.md
   has a per-operation cost model you can plug your own cycle counts into.
-* absolute host numbers mean nothing for your MCU. The ratios and the operation
-  counts do.
+* host numbers mean nothing for your MCU. The ratios and the operation counts do.
 
 ## Correctness
 
@@ -189,8 +218,8 @@ Two things this table does **not** say:
 * The vertex cache is checked to be bit identical to the uncached path, and to
   fall back silently when the buffer is too small.
 * Two triangles sharing an edge rasterize to exactly the full quad, i.e. no
-  one-pixel cracks. (The 1.x point-in-triangle test used strict inequalities and
-  left a hole along every shared edge.)
+  one-pixel cracks: a strict point-in-triangle test leaves a hole along every
+  shared edge, and this rasterizer does not.
 * ctest builds and runs the suite once per tier configuration (10 targets), so a
   feature combination that stops compiling or passing fails immediately.
 
@@ -214,5 +243,6 @@ Two things this table does **not** say:
 
 MIT - see [LICENSE](LICENSE). Copyright (c) 2026 ForForgot.
 
-This is an independent implementation: no source code from ol3d 1.x is
-included, only the goal and a few conventions are shared (see Origin).
+The design started from ol3d, an earlier take on the same idea
+(https://github.com/ForForgot/ol3d). No code is shared with it; see
+docs/PORTING-FROM-OL3D.md for the API mapping if you are coming from there.

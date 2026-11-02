@@ -199,9 +199,8 @@ static void test_raster_area(void) {
     CHECK(g_color[100 * FBW + 100] == 0);
     CHECK(g_color[20 * FBW + 20] != 0);
 
-    /* Two triangles sharing an edge must leave no crack along it.  The 1.x
-     * point-in-triangle test used strict inequalities, so every shared edge
-     * was a one pixel hole. */
+    /* Two triangles sharing an edge must leave no crack along it: a strict
+     * point-in-triangle test leaves a one pixel hole on every shared edge. */
     reset_fb();
     embd3d_screen_vertex_t q0 = sv(10, 10, Z_MID, TEST_WHITE);
     embd3d_screen_vertex_t q1 = sv(110, 10, Z_MID, TEST_WHITE);
