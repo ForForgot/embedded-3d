@@ -152,6 +152,7 @@ Everything is a macro in src/embd3d_config.h, overridable from the build system
 | EMBD3D_COLOR_FORMAT | 0 | 0 = RGB565 (2 B/px), 1 = L8 luminance (1 B/px) |
 | EMBD3D_DEPTH_BITS | 16 | 16 (2 B/px) or 8 (1 B/px) depth levels |
 | EMBD3D_INDEX_TYPE | uint16_t | mesh index type |
+| EMBD3D_VALIDATE_MESH | 0 | range check mesh indices while you build a mesh |
 | EMBD3D_SUBPIXEL_BITS | 4 | rasterizer subpixel precision; 4 is safe to ~570 px wide, each extra bit halves that (int32 edge functions) |
 
 Render flags (ctx.flags):

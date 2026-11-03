@@ -4,6 +4,33 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-11-03
+
+### Fixed
+
+- **Undefined behaviour in the rasterizer and in the fixed point path.** The
+  depth plane setup, the line DDA, the Q16.16 vertex transform and both fixed
+  point clippers shifted signed values left to scale them by a power of two,
+  which is undefined in C. The output was correct on every compiler tested,
+  because they all emit an arithmetic shift, but nothing guarantees it. All of
+  them now multiply instead; the three reference frames are bit identical
+  before and after.
+
+### Added
+
+- `EMBD3D_VALIDATE_MESH`: opt-in range check of mesh indices, so a mesh with a
+  bad index skips the triangle instead of reading past the position array.
+  Exercised by an 11th CTest configuration.
+- ASan + UBSan CI job - it is what found the bug above.
+- Cross builds in CI with `arm-none-eabi-gcc` (Cortex-M0/M3/M4F/M7) and
+  `avr-gcc` (ATmega328P/2560). On a `v*` tag the libraries are attached to the
+  release with checksums.
+- `CHANGELOG.md`, issue and pull request templates.
+- `examples/arduino/embd3d_spin/README.md`: what the sketch assumes, a bring-up
+  checklist, a framebuffer checksum self test, and an honest note that it has not
+  been run on hardware yet.
+- Unit test for `embd3d_fb_export_rgb888()`.
+
 ## [1.0.0] - 2026-11-02
 
 First release.
@@ -26,9 +53,8 @@ First release.
   `EMBD3D_ENABLE_LIGHTING`, `EMBD3D_ENABLE_FULL_CLIP`, `EMBD3D_ENABLE_VERTEX_CACHE`,
   `EMBD3D_DEPTH_BITS`, `EMBD3D_COLOR_FORMAT`, `EMBD3D_INDEX_TYPE`, `EMBD3D_SUBPIXEL_BITS`.
 - Unit tests built once per tier configuration (10 CTest targets).
-- CI on Linux, macOS and Windows, a `-Werror -Wpedantic` job, a C++ consumer link check,
-  an ASan + UBSan job, and cross builds for Cortex-M0/M3/M4F/M7 and ATmega328P/2560 that
-  attach themselves to the release.
+- CI on Linux, macOS and Windows, plus a `-Werror -Wpedantic` job and a C++ consumer
+  link check.
 - MIT licence.
 
 ### Notes

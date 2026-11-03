@@ -1,0 +1,51 @@
+name: Bug report
+description: Wrong picture, crash, or a build failure
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Filling in the target and the tier usually
+        explains half of it - a flat colour is a tier setting, not a bug.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens, and what you expected
+    validations:
+      required: true
+
+  - type: input
+    id: target
+    attributes:
+      label: Target
+      placeholder: STM32F401 (Cortex-M4F), ATmega328P at 16 MHz, x86-64 host...
+    validations:
+      required: true
+
+  - type: input
+    id: tier
+    attributes:
+      label: Tier and configuration
+      placeholder: MINIMAL with EMBD3D_ENABLE_FLOAT=0, EMBD3D_DEPTH_BITS=8, EMBD3D_COLOR_FORMAT=1
+
+  - type: input
+    id: toolchain
+    attributes:
+      label: Compiler and flags
+      placeholder: arm-none-eabi-gcc 13.2, -Os, -mcpu=cortex-m4 -mfloat-abi=hard
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The mesh, the matrices and the draw call - a few lines are enough.
+      render: c
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Frame size, depth bits, what the buffer looks like, a photo of the panel.

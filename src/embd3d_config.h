@@ -157,6 +157,15 @@ typedef EMBD3D_INDEX_TYPE embd3d_index_t;
 #define EMBD3D_MAX_CLIP_VERTS 9
 #endif
 
+/* Runtime validation of mesh data: with this at 1 every triangle checks that
+ * its three vertex indices are inside vertex_count before touching the
+ * position array, and skips the triangle if they are not.  Costs one compare
+ * per index in the draw loop, so it is off by default - turn it on while you
+ * are building a mesh, and leave it off in the shipped firmware. */
+#ifndef EMBD3D_VALIDATE_MESH
+#define EMBD3D_VALIDATE_MESH 0
+#endif
+
 /* Q16.16 fixed point scalar used by the integer pipeline. */
 typedef int32_t embd3d_fx_t;
 #define EMBD3D_FX_ONE 65536

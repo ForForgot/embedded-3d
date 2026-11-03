@@ -316,6 +316,12 @@ static void draw_f_impl(embd3d_framebuffer_t *fb, const embd3d_mesh_t *mesh,
 
     for (uint32_t t = 0; t < (uint32_t)mesh->triangle_count; t++) {
         const embd3d_index_t *idx = &mesh->indices[t * 3u];
+#if EMBD3D_VALIDATE_MESH
+        if (idx[0] >= mesh->vertex_count || idx[1] >= mesh->vertex_count ||
+            idx[2] >= mesh->vertex_count) {
+            continue;               /* bad index: draw nothing, do not read OOB */
+        }
+#endif
         const embd3d_real_t *ps[3];
         ps[0] = &mesh->positions[(uint32_t)idx[0] * 3u];
         ps[1] = &mesh->positions[(uint32_t)idx[1] * 3u];
@@ -612,6 +618,12 @@ static void draw_fx_impl(embd3d_framebuffer_t *fb, const embd3d_mesh_fx_t *mesh,
 
     for (uint32_t t = 0; t < (uint32_t)mesh->triangle_count; t++) {
         const embd3d_index_t *idx = &mesh->indices[t * 3u];
+#if EMBD3D_VALIDATE_MESH
+        if (idx[0] >= mesh->vertex_count || idx[1] >= mesh->vertex_count ||
+            idx[2] >= mesh->vertex_count) {
+            continue;
+        }
+#endif
         const embd3d_fx_t *ps[3];
         ps[0] = &mesh->positions[(uint32_t)idx[0] * 3u];
         ps[1] = &mesh->positions[(uint32_t)idx[1] * 3u];

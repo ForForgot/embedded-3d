@@ -386,6 +386,29 @@ static void test_clipping(void) {
 }
 #endif /* EMBD3D_ENABLE_FLOAT */
 
+static void test_export_rgb888(void) {
+    static uint8_t out[FBW * FBH * 3];
+    reset_fb();
+    g_color[0] = EMBD3D_RGB(255, 0, 0);
+    g_color[1] = EMBD3D_RGB(0, 255, 0);
+    g_color[2] = EMBD3D_RGB(0, 0, 255);
+    g_color[3] = EMBD3D_RGB(255, 255, 255);
+
+    embd3d_fb_export_rgb888(&g_fb, out);
+
+#if EMBD3D_COLOR_FORMAT == 0
+    CHECK(out[0] == 255 && out[1] == 0 && out[2] == 0);
+    CHECK(out[3] == 0 && out[4] == 255 && out[5] == 0);
+    CHECK(out[6] == 0 && out[7] == 0 && out[8] == 255);
+    CHECK(out[9] == 255 && out[10] == 255 && out[11] == 255);
+#else
+    CHECK(out[0] > 0 && out[0] == out[1] && out[1] == out[2]);   /* L8 replicated */
+    CHECK(out[9] == 255 && out[10] == 255 && out[11] == 255);
+#endif
+    /* the rest of the frame stays black */
+    CHECK(out[(FBW * FBH - 1) * 3 + 0] == 0);
+}
+
 static void test_framebuffer(void) {
     embd3d_fb_clear(&g_fb, EMBD3D_RGB(10, 20, 30));
     for (long i = 0; i < (long)(FBW * FBH); i++) {
@@ -416,6 +439,40 @@ static void test_framebuffer(void) {
     CHECK(embd3d_color_shade(EMBD3D_RGB(255, 255, 255), 128) != 0);
 }
 
+
+#if EMBD3D_VALIDATE_MESH
+/* A triangle that points past the end of the vertex array must be skipped, not
+ * read out of bounds.  Only built when the check is compiled in. */
+static void test_mesh_validation(void) {
+    static const embd3d_real_t pos[] = { 0, 0, 0,  1, 0, 0,  0, 1, 0 };
+    static const embd3d_index_t idx[] = { 0, 1, 5 };   /* vertex 5 does not exist */
+    embd3d_mesh_t mesh = { pos, idx, 3, 1, TEST_WHITE };
+
+    embd3d_render_ctx_t ctx;
+    embd3d_render_ctx_init(&ctx, 0.5f, 30.0f);
+    ctx.flags = 0;
+
+    embd3d_mat4_t mvp;
+    embd3d_mat4_identity(mvp);
+
+#if EMBD3D_ENABLE_FLOAT
+    reset_fb();
+    embd3d_draw_mesh(&g_fb, &mesh, mvp, 0, &ctx);
+    CHECK(lit_pixels() == 0);
+#endif
+
+#if EMBD3D_ENABLE_FIXED
+    static embd3d_fx_t pos_fx[9];
+    embd3d_mesh_positions_to_fx(pos_fx, pos, 3);
+    embd3d_mesh_fx_t mesh_fx = { pos_fx, idx, 3, 1, TEST_WHITE };
+    embd3d_mat4_fx_t mvp_fx;
+    embd3d_mat4_to_fx(mvp_fx, mvp);
+    reset_fb();
+    embd3d_draw_mesh_fx(&g_fb, &mesh_fx, mvp_fx, &ctx);
+    CHECK(lit_pixels() == 0);
+#endif
+}
+#endif
 
 /* ------------------------------------------------------- tiered paths --- */
 #if EMBD3D_ENABLE_FLOAT   /* every helper below is only used by the float tests */
@@ -701,6 +758,10 @@ int main(void) {
     printf("vec3...\n");     test_vec3();
     printf("mat4...\n");     test_mat4();
     printf("framebuffer...\n"); test_framebuffer();
+    printf("rgb888 export...\n"); test_export_rgb888();
+#if EMBD3D_VALIDATE_MESH
+    printf("mesh validation...\n"); test_mesh_validation();
+#endif
     printf("raster area...\n");  test_raster_area();
     printf("raster depth...\n"); test_raster_depth();
     printf("raster cull...\n");  test_raster_cull();

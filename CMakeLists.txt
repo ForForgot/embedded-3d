@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(embd3d VERSION 1.0.0 LANGUAGES C)
+project(embd3d VERSION 1.0.1 LANGUAGES C)
 
 option(EMBD3D_BUILD_EXAMPLES "Build the demo programs" ON)
 option(EMBD3D_BUILD_TESTS    "Build the unit tests and the tier matrix" ON)
@@ -48,6 +48,7 @@ if(EMBD3D_BUILD_TESTS)
         "m0_build|EMBD3D_ENABLE_FLOAT=0|EMBD3D_ENABLE_LIGHTING=0|EMBD3D_DEPTH_BITS=8"
         "double_scalars|EMBD3D_REAL=double"
         "subpixel5|EMBD3D_SUBPIXEL_BITS=5"
+        "validated|EMBD3D_VALIDATE_MESH=1"
     )
 
     foreach(cfg IN LISTS EMBD3D_TIER_CONFIGS)
