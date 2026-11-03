@@ -2,6 +2,7 @@ name: build-and-test
 
 on:
   push:
+    branches: ["**"]      # tag pushes are handled by cross-libs.yml
   pull_request:
 
 jobs:
